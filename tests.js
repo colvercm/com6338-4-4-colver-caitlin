@@ -73,7 +73,7 @@ body.appendChild(testBtn)
 const scriptPaths = [
   "https://cdnjs.cloudflare.com/ajax/libs/mocha/8.3.2/mocha.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/chai/4.3.4/chai.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/sinon.js/10.0.1/sinon.min.js",
+  // "https://cdnjs.cloudflare.com/ajax/libs/sinon.js/10.0.1/sinon.min.js",
   // "jsdom.js" // npx browserify _jsdom.js --standalone JSDOM -o jsdom.js
 ]
 const scriptTags = scriptPaths.map(path => {
@@ -117,118 +117,238 @@ function __handleClick() {
 function runTests() {
   testBtn.textContent = 'Running Tests'
   testBtn.disabled = true
+
   mochaDiv.style.display = 'block'
   body.style.overflow = 'hidden'
 
   mocha.setup("bdd");
   const expect = chai.expect;
 
-  describe("Scantron Simulator Practice", function () {
-    const pressKey = letter => document.dispatchEvent(new KeyboardEvent('keyup', { key: letter }))
-    let previousLetterEl = document.getElementById('previous-letter')
-    let lastGuessEl = document.getElementById('last-guess')
-    let scoreEl = document.getElementById('score')
-    let correctEl = document.getElementById('correct')
-    let incorrectEl = document.getElementById('incorrect')
-    let randomStub
-    let resetBtn = document.querySelector('.game button')
-    const stubRandom = num => {
-      if (randomStub) randomStub.restore()
-      randomStub = sinon.stub(Math, 'random').returns(num)
-    }
-    beforeEach(() => {
-      stubRandom(0)
+  String.prototype.includesLetters = function(letters) {
+    return letters.split("").every((letter) => this.includes(letter))
+  }
+
+  describe("Word Guess Assignment", function () {
+    const wordToGuess = document.getElementById('word-to-guess')
+    const remainingGuessDisplay = document.getElementById('remaining-guesses')
+    const incorrectLettersDisplay = document.getElementById('incorrect-letters')
+    const previousWord = document.getElementById('previous-word')
+    const winDisplay = document.getElementById('wins')
+    const lossDisplay = document.getElementById('losses')
+    const pressKey = letter => body.dispatchEvent(new KeyboardEvent('keyup', { key: letter }))
+    afterEach(() => {
+      sinon.restore()
     })
-    afterEach(sinon.restore)
     after(() => {
       testBtn.disabled = false
       testBtn.textContent = 'Close Tests'
     })
-    describe('setup', () => {
-      it('should start with blank score element', () => {
-        expect(scoreEl.textContent).to.be.empty
+    describe('Initial Setup', () => {
+      it('Should have words defined', () => {
+        expect(words).to.exist
+        expect(words).to.deep.eq([
+          'bananas',
+          'grapes',
+          'carousel',
+          'milkshake',
+          'javascript',
+          'limousine',
+          'chocolate',
+          'programming',
+          'meatloaf',
+          'ukulele',
+          'mango'
+        ])
       })
-      it('should start with blank previous letter element ', () => {
-        expect(previousLetterEl.textContent).to.be.empty
+      it('Should display one underscore for each letter of current word', () => {
+        expect(wordToGuess.textContent).to.eq('_______')
       })
-      it('should start with blank last guess element ', () => {
-        expect(lastGuessEl.textContent).to.be.empty
+      it('Should display 10 guesses at game start', () => {
+        expect(remainingGuessDisplay.textContent).to.eq('10')
       })
-      it('should start with correct count of 0', () => {
-        expect(correctEl.textContent).to.eq('0')
+      it('Should not display any previous word at game start', () => {
+        expect(previousWord.textContent).to.eq('')
       })
-      it('should start with incorrect count of 0', () => {
-        expect(incorrectEl.textContent).to.eq('0')
+      it('Should not display any incorrect letters at game start', () => {
+        expect(incorrectLettersDisplay.textContent).to.eq('')
       })
-      it('should do nothing when pressing an invalid key', () => {
-        pressKey(' ')
-        pressKey('Shift')
-        pressKey('Alt')
-        pressKey(',')
-        pressKey('z')
-        pressKey('Control')
-        expect(scoreEl.textContent).to.be.empty
-        expect(previousLetterEl.textContent).to.be.empty
-        expect(lastGuessEl.textContent).to.be.empty
-        expect(correctEl.textContent).to.eq('0')
-        expect(incorrectEl.textContent).to.eq('0')
+      it('Should display 0 wins at game start', () => {
+        expect(winDisplay.textContent).to.eq('0')
       })
-    })
-    describe('guessing incorrectly', () => {
-      it('should increment incorrect count', () => {
-        pressKey('e')
-        expect(incorrectEl.textContent).to.eq('1')
-      })
-      it('should NOT increment correct count', () => {
-        expect(correctEl.textContent).to.eq('0')
-      })
-      it('should update score', () => {
-        expect(scoreEl.textContent).to.eq('0%')
-      })
-      it('should show guessed letter', () => {
-        expect(lastGuessEl.textContent.toLowerCase()).to.eq('e')
-      })
-      it('should reveal previous letter', () => {
-        expect(previousLetterEl.textContent.toLowerCase()).to.eq('a')
+      it('Should display 0 losses at game start', () => {
+        expect(lossDisplay.textContent).to.eq('0')
       })
     })
-    describe('guessing correctly', () => {
-      it('should increment correct count', () => {
+    describe('Playing against the word "bananas" and winning', () => {
+      it('Should count "b" as a correct guess', () => {
+        pressKey('b')
+        expect(wordToGuess.textContent).to.eq('b______')
+        expect(remainingGuessDisplay.textContent).to.eq('10')
+        expect(incorrectLettersDisplay.textContent.includes('b')).to.be.false
+      })
+      it('Should count "i" as an incorrect guess', () => {
+        pressKey('i')
+        expect(wordToGuess.textContent).to.eq('b______')
+        expect(incorrectLettersDisplay.textContent.includes('i')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includes('b')).to.be.false
+        expect(remainingGuessDisplay.textContent).to.eq('9')
+      })
+      it('Solving the word should increase wins and reset the game with the next word', () => {
+        sinon.stub(Math, 'random').returns(0.43)
+        expect(incorrectLettersDisplay.textContent.includes('i')).to.be.true
+        expect(remainingGuessDisplay.textContent).to.eq('9')
         pressKey('a')
-        expect(incorrectEl.textContent).to.eq('1')
-      })
-      it('should NOT increment incorrect count', () => {
-        expect(correctEl.textContent).to.eq('1')
-      })
-      it('should update score', () => {
-        expect(scoreEl.textContent).to.eq('50%')
-      })
-      it('should show guessed letter', () => {
-        expect(lastGuessEl.textContent.toLowerCase()).to.eq('a')
-      })
-      it('should reveal previous letter', () => {
-        expect(previousLetterEl.textContent.toLowerCase()).to.eq('a')
+        expect(incorrectLettersDisplay.textContent.includes('b')).to.be.false
+        expect(incorrectLettersDisplay.textContent.includes('a')).to.be.false
+        expect(remainingGuessDisplay.textContent).to.eq('9')
+        expect(wordToGuess.textContent).to.eq('ba_a_a_')
+        pressKey('n')
+        expect(incorrectLettersDisplay.textContent.includes('b')).to.be.false
+        expect(incorrectLettersDisplay.textContent.includes('a')).to.be.false
+        expect(incorrectLettersDisplay.textContent.includes('n')).to.be.false
+        expect(remainingGuessDisplay.textContent).to.eq('9')
+        expect(wordToGuess.textContent).to.eq('banana_')
+        pressKey('s')
+        expect(winDisplay.textContent).to.eq('1')
+        expect(lossDisplay.textContent).to.eq('0')
+        expect(incorrectLettersDisplay.textContent).to.eq('')
+        expect(remainingGuessDisplay.textContent).to.eq('10')
+        expect(wordToGuess.textContent).to.eq('__________')
       })
     })
-    describe('reset button', () => {
-      it('should exist on page', () => {
-        expect(resetBtn).to.exist
-        expect(resetBtn).to.not.eq(testBtn)
-        expect(resetBtn.textContent.toLowerCase())
-          .to.include('reset')
+    describe('Playing against the word "javascript" and winning', () => {
+      it('should display previous word "bananas"', () => {
+        expect(previousWord.textContent).to.eq('bananas')
       })
-      it('should reset all info when clicked', () => {
-        scoreEl.textContent = 'banana'
-        previousLetterEl.textContent = 'banana'
-        lastGuessEl.textContent = 'banana'
-        correctEl.textContent = 'banana'
-        incorrectEl.textContent = 'banana'
-        resetBtn.click()
-        expect(scoreEl.textContent).to.be.empty
-        expect(previousLetterEl.textContent).to.be.empty
-        expect(lastGuessEl.textContent).to.be.empty
-        expect(correctEl.textContent).to.eq('0')
-        expect(incorrectEl.textContent).to.eq('0')
+      it('Should count 3 incorrect guesses', () => {
+        pressKey('x')
+        expect(remainingGuessDisplay.textContent).to.eq('9')
+        expect(incorrectLettersDisplay.textContent.includes('x')).to.be.true
+        expect(wordToGuess.textContent).to.eq('__________')
+        pressKey('y')
+        expect(remainingGuessDisplay.textContent).to.eq('8')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xy')).to.be.true
+        expect(wordToGuess.textContent).to.eq('__________')
+        pressKey('z')
+        expect(remainingGuessDisplay.textContent).to.eq('7')
+        expect(wordToGuess.textContent).to.eq('__________')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xyz')).to.be.true
+      })
+      it('Should count 3 correct guesses', () => {
+        pressKey('j')
+        expect(wordToGuess.textContent).to.eq('j_________')
+        pressKey('a')
+        expect(wordToGuess.textContent).to.eq('ja_a______')
+        pressKey('v')
+        expect(wordToGuess.textContent).to.eq('java______')
+        expect(remainingGuessDisplay.textContent).to.eq('7')
+      })
+      it('Solving the word should increase wins and reset the game with the next word', () => {
+        sinon.stub(Math, 'random').returns(0.99)
+        expect(wordToGuess.textContent).to.eq('java______')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xyz')).to.be.true
+        expect(remainingGuessDisplay.textContent).to.eq('7')
+        pressKey('s')
+        expect(wordToGuess.textContent).to.eq('javas_____')
+        pressKey('c')
+        expect(wordToGuess.textContent).to.eq('javasc____')
+        pressKey('r')
+        expect(wordToGuess.textContent).to.eq('javascr___')
+        pressKey('i')
+        expect(wordToGuess.textContent).to.eq('javascri__')
+        pressKey('p')
+        expect(wordToGuess.textContent).to.eq('javascrip_')
+        pressKey('t')
+        expect(wordToGuess.textContent).to.eq('_____')
+        expect(winDisplay.textContent).to.eq('2')
+        expect(lossDisplay.textContent).to.eq('0')
+        expect(incorrectLettersDisplay.textContent).to.eq('')
+        expect(remainingGuessDisplay.textContent).to.eq('10')
+      })
+    })
+    describe('Playing against the word "mango" and losing', () => {
+      it('should display previous word "javascript"', () => {
+        expect(previousWord.textContent).to.eq('javascript')
+      })
+      it('Should count 3 incorrect guesses', () => {
+        pressKey('x')
+        expect(remainingGuessDisplay.textContent).to.eq('9')
+        expect(incorrectLettersDisplay.textContent.includes('x')).to.be.true
+        expect(wordToGuess.textContent).to.eq('_____')
+        pressKey('y')
+        expect(remainingGuessDisplay.textContent).to.eq('8')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xy')).to.be.true
+        expect(wordToGuess.textContent).to.eq('_____')
+        pressKey('z')
+        expect(remainingGuessDisplay.textContent).to.eq('7')
+        expect(wordToGuess.textContent).to.eq('_____')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xyz')).to.be.true
+      })
+      it('Should count a mix of 4 correct and 7 incorrect guesses correctly', () => {
+        pressKey('m')
+        expect(remainingGuessDisplay.textContent).to.eq('7')
+        expect(wordToGuess.textContent).to.eq('m____')
+        expect(incorrectLettersDisplay.textContent.includesLetters('xyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includes('m')).to.be.false
+
+        pressKey('w')
+        expect(remainingGuessDisplay.textContent).to.eq('6')
+        expect(wordToGuess.textContent).to.eq('m____')
+        expect(incorrectLettersDisplay.textContent.includesLetters('wxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includes('m')).to.be.false
+
+        pressKey('a')
+        expect(remainingGuessDisplay.textContent).to.eq('6')
+        expect(wordToGuess.textContent).to.eq('ma___')
+        expect(incorrectLettersDisplay.textContent.includesLetters('wxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('ma')).to.be.false
+
+        pressKey('v')
+        expect(remainingGuessDisplay.textContent).to.eq('5')
+        expect(wordToGuess.textContent).to.eq('ma___')
+        expect(incorrectLettersDisplay.textContent.includesLetters('vwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('ma')).to.be.false
+
+        pressKey('u')
+        expect(remainingGuessDisplay.textContent).to.eq('4')
+        expect(wordToGuess.textContent).to.eq('ma___')
+        expect(incorrectLettersDisplay.textContent.includesLetters('uvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('ma')).to.be.false
+
+        pressKey('n')
+        expect(remainingGuessDisplay.textContent).to.eq('4')
+        expect(wordToGuess.textContent).to.eq('man__')
+        expect(incorrectLettersDisplay.textContent.includesLetters('uvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('man')).to.be.false
+
+        pressKey('t')
+        expect(remainingGuessDisplay.textContent).to.eq('3')
+        expect(wordToGuess.textContent).to.eq('man__')
+        expect(incorrectLettersDisplay.textContent.includesLetters('tuvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('man')).to.be.false
+
+        pressKey('s')
+        expect(remainingGuessDisplay.textContent).to.eq('2')
+        expect(wordToGuess.textContent).to.eq('man__')
+        expect(incorrectLettersDisplay.textContent.includesLetters('stuvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('man')).to.be.false
+
+        pressKey('g')
+        expect(remainingGuessDisplay.textContent).to.eq('2')
+        expect(wordToGuess.textContent).to.eq('mang_')
+        expect(incorrectLettersDisplay.textContent.includesLetters('stuvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('mang')).to.be.false
+
+        pressKey('r')
+        expect(remainingGuessDisplay.textContent).to.eq('1')
+        expect(wordToGuess.textContent).to.eq('mang_')
+        expect(incorrectLettersDisplay.textContent.includesLetters('rstuvwxyz')).to.be.true
+        expect(incorrectLettersDisplay.textContent.includesLetters('mang')).to.be.false
+
+        pressKey('q')
+        expect(remainingGuessDisplay.textContent).to.eq('10')
+        expect(winDisplay.textContent).to.eq('2')
+        expect(lossDisplay.textContent).to.eq('1')
       })
     })
   });
